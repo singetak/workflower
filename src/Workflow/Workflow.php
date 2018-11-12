@@ -288,16 +288,17 @@ class Workflow implements EntityInterface, IdentifiableInterface, \Serializable
      */
     public function getCurrentFlowObject()
     {
-        $state = $this->stateMachine->getCurrentState();
-        if ($state === null) {
-            return null;
-        }
+//         $state = $this->stateMachine->getCurrentState();
+//         if ($state === null) {
+//             return null;
+//         }
 
-        if ($state instanceof FinalState) {
-            return $this->flowObjectCollection->get($this->stateMachine->getPreviousState()->getStateId());
-        } else {
-            return $this->flowObjectCollection->get($state->getStateId());
-        }
+//         if ($state instanceof FinalState) {
+//             return $this->flowObjectCollection->get($this->stateMachine->getPreviousState()->getStateId());
+//         } else {
+//             return $this->flowObjectCollection->get($state->getStateId());
+//         }
+        return $this->flowObjectCollection->get($this->currentFlowId);
     }
 
     /**
