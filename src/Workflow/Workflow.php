@@ -102,10 +102,7 @@ class Workflow implements EntityInterface, IdentifiableInterface, \Serializable
      * @since Property available since Release 1.2.0
      */
     private $operationRunner;
-    /**
-     * @var string
-     */
-    private $currentFlowId;
+
     /**
      * @param int|string $id
      * @param string     $name
@@ -131,7 +128,6 @@ class Workflow implements EntityInterface, IdentifiableInterface, \Serializable
             'roleCollection' => $this->roleCollection,
             'startDate' => $this->startDate,
             'endDate' => $this->endDate,
-            'currentFlowId' => $this->currentFlowId,
             'stateMachine' => $this->stateMachine,
         ));
     }
@@ -288,17 +284,16 @@ class Workflow implements EntityInterface, IdentifiableInterface, \Serializable
      */
     public function getCurrentFlowObject()
     {
-//         $state = $this->stateMachine->getCurrentState();
-//         if ($state === null) {
-//             return null;
-//         }
+        $state = $this->stateMachine->getCurrentState();
+        if ($state === null) {
+            return null;
+        }
 
-//         if ($state instanceof FinalState) {
-//             return $this->flowObjectCollection->get($this->stateMachine->getPreviousState()->getStateId());
-//         } else {
-//             return $this->flowObjectCollection->get($state->getStateId());
-//         }
-        return $this->flowObjectCollection->get($this->currentFlowId);
+        if ($state instanceof FinalState) {
+            return $this->flowObjectCollection->get($this->stateMachine->getPreviousState()->getStateId());
+        } else {
+            return $this->flowObjectCollection->get($state->getStateId());
+        }
     }
 
     /**
@@ -327,24 +322,25 @@ class Workflow implements EntityInterface, IdentifiableInterface, \Serializable
     public function start(StartEvent $event)
     {
         $this->startDate = new \DateTime();
-        $this->currentFlowId = $event->getId();
         $this->stateMachine->start();
         $this->stateMachine->triggerEvent($event->getId());
         $this->selectSequenceFlow($event);
         $this->next();
     }
+
     /**
      * {@inheritdoc}
      */
     public function startFrom(StartEvent $event, FlowObjectInterface $target = null)
     {
         $this->startDate = new \DateTime();
-        $this->currentFlowId = $event->getId();
         $this->stateMachine->start();
         $this->stateMachine->triggerEvent($event->getId());
+        $this->stateMachine->triggerEvent($target->getId());
         $this->selectSequenceFlow($event);
-        $this->next($target);
+        $this->next();
     }
+
     /**
      * @param ActivityInterface    $activity
      * @param ParticipantInterface $participant
@@ -373,14 +369,14 @@ class Workflow implements EntityInterface, IdentifiableInterface, \Serializable
      * @param ActivityInterface    $activity
      * @param ParticipantInterface $participant
      */
-    public function completeWorkItem(ActivityInterface $activity, ParticipantInterface $participant, FlowObjectInterface $target = null)
+    public function completeWorkItem(ActivityInterface $activity, ParticipantInterface $participant)
     {
         $this->assertParticipantHasRole($activity, $participant);
         $this->assertCurrentFlowObjectIsExpectedActivity($activity);
 
         $activity->complete($participant);
         $this->selectSequenceFlow($activity);
-        $this->next($target);
+        $this->next();
     }
 
     /**
@@ -552,25 +548,8 @@ class Workflow implements EntityInterface, IdentifiableInterface, \Serializable
     /**
      * @since Method available since Release 1.2.0
      */
-    private function next(FlowObjectInterface $target = null)
+    private function next()
     {
-        $currentFlowObject = $this->getCurrentFlowObject();
-        $connections = $this->getConnectingObjectCollectionBySource($currentFlowObject);
-        if (count($connections) <= 0) {
-            // I dunno
-            return;
-        }
-        $connections = $connections->toArray();
-        $this->activityLog[] = $this->currentFlowId;
-        $this->currentFlowId = reset($connections)->getDestination()->getId();
-        if ($target) {
-            foreach ($connections as $connection) {
-                if ($connection->getDestination() == $target) {
-                    $this->currentFlowId = $target->getId();
-                }
-            }
-        }
-
         $currentFlowObject = $this->getCurrentFlowObject();
         if ($currentFlowObject instanceof ActivityInterface) {
             $currentFlowObject->createWorkItem();
